@@ -1,0 +1,5 @@
+# React frontend packages (to be installed via npm)
+@mui/material
+@mui/icons-material
+react
+react-dom
