@@ -1,5 +1,4 @@
-Flask==2.2.3
+Flask==2.0.1
 flask-cors==3.0.10
-youtube-transcript-api==0.4.1
-transformers==4.24.0
-torch==1.12.1
+youtube-transcript-api==0.4.4
+cohere==3.3.0

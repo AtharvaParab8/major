@@ -1,0 +1,21 @@
+# Python
+_pycache_/
+*.pyc
+*.pyo
+*.pyd
+.env
+venv/
+.env/
+
+# Node.js
+node_modules/
+dist/
+.vite/
+.vite-cache/
+*.log
+
+# Editor/OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
