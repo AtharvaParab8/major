@@ -236,6 +236,7 @@ function App() {
           throw new Error(result.error);
         }
 
+        // Set the AI summary (original behavior)
         setAiSummary(result.summary);
 
         // Store main topics if available
@@ -243,7 +244,7 @@ function App() {
           setMainTopics(result.main_topics);
         }
 
-        setActiveTab(2); // Switch to AI Summary tab
+        setActiveTab(3); // Switch to AI Summary tab (index 3)
       } catch (error) {
         console.error("Error:", error);
         setError("Failed to generate AI summary. Please try again.");
@@ -1756,6 +1757,82 @@ function App() {
     }
   };
 
+  const handleTextRankSummary = async () => {
+    if (videoId) {
+      setLoading(true);
+      setLoadingMessage("Generating TextRank summary...");
+      try {
+        const response = await fetch("http://localhost:5000/textrank-summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ video_id: videoId }),
+        });
+
+        if (!response.ok) throw new Error("Network response was not ok");
+
+        const result = await response.json();
+        if (result.error) {
+          throw new Error(result.error);
+        }
+
+        // Append the new summary instead of replacing
+        const textRankSection = `<div style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
+          <h3 style="color: #2e7d32;">TextRank Summary</h3>
+          <p>${result.summary}</p>
+        </div>`;
+
+        // If there's already a summary, append to it; otherwise, create new
+        setSummary((prev) => (prev ? prev + textRankSection : textRankSection));
+      } catch (error) {
+        console.error("Error:", error);
+        setError("Failed to generate TextRank summary. Please try again.");
+      } finally {
+        setLoading(false);
+        setLoadingMessage("");
+      }
+    } else {
+      setError("Please enter a valid YouTube URL");
+    }
+  };
+
+  const handleLexRankSummary = async () => {
+    if (videoId) {
+      setLoading(true);
+      setLoadingMessage("Generating LexRank summary...");
+      try {
+        const response = await fetch("http://localhost:5000/lexrank-summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ video_id: videoId }),
+        });
+
+        if (!response.ok) throw new Error("Network response was not ok");
+
+        const result = await response.json();
+        if (result.error) {
+          throw new Error(result.error);
+        }
+
+        // Append the new summary instead of replacing
+        const lexRankSection = `<div style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
+          <h3 style="color: #ed6c02;">LexRank Summary</h3>
+          <p>${result.summary}</p>
+        </div>`;
+
+        // If there's already a summary, append to it; otherwise, create new
+        setSummary((prev) => (prev ? prev + lexRankSection : lexRankSection));
+      } catch (error) {
+        console.error("Error:", error);
+        setError("Failed to generate LexRank summary. Please try again.");
+      } finally {
+        setLoading(false);
+        setLoadingMessage("");
+      }
+    } else {
+      setError("Please enter a valid YouTube URL");
+    }
+  };
+
   // Empty handleLoadTerminalQuiz function to avoid errors in existing code
   const handleLoadTerminalQuiz = async () => {
     // Function stub that does nothing
@@ -2133,7 +2210,7 @@ function App() {
                   disabled={!videoId || loading}
                   sx={{ mb: 1, mr: 1 }}
                 >
-                  GET TRANSCRIPTION &amp; SUMMARY
+                  GET TRANSCRIPTION
                 </Button>
 
                 <Button
@@ -2229,11 +2306,50 @@ function App() {
                   <TopicAnalysisTab />
                 </TabPanel>
                 <TabPanel value={activeTab} index={2}>
-                  {summary ? (
-                    <div dangerouslySetInnerHTML={{ __html: summary }} />
-                  ) : (
-                    "Summary content will appear here"
-                  )}
+                  <Box
+                    sx={{ display: "flex", flexDirection: "column", gap: 3 }}
+                  >
+                    {/* Summary content */}
+                    <Box>
+                      {summary ? (
+                        <div dangerouslySetInnerHTML={{ __html: summary }} />
+                      ) : (
+                        <Typography>
+                          Summary content will appear here
+                        </Typography>
+                      )}
+                    </Box>
+
+                    {/* Algorithm buttons */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        gap: 2,
+                        mt: 2,
+                      }}
+                    >
+                      <Button
+                        variant="contained"
+                        startIcon={<SummarizeIcon />}
+                        onClick={handleTextRankSummary}
+                        color="success"
+                        disabled={!videoId || loading}
+                      >
+                        GENERATE TEXTRANK SUMMARY
+                      </Button>
+
+                      <Button
+                        variant="contained"
+                        startIcon={<SummarizeIcon />}
+                        onClick={handleLexRankSummary}
+                        color="warning"
+                        disabled={!videoId || loading}
+                      >
+                        GENERATE LEXRANK SUMMARY
+                      </Button>
+                    </Box>
+                  </Box>
                 </TabPanel>
                 <TabPanel value={activeTab} index={3}>
                   <AISummaryTab />

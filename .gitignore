@@ -1,18 +1,18 @@
 # Python
-_pycache_/
-*.pyc
-*.pyo
-*.pyd
-.env
-venv/
-.env/
+Backend/_pycache_/
+Backend/*.pyc
+Backend/*.pyo
+Backend/*.pyd
+Backend/.env
+Backend/venv/
+Backend/.env/
 
 # Node.js
-node_modules/
-dist/
-.vite/
-.vite-cache/
-*.log
+Frontend/node_modules/
+Frontend/dist/
+Frontend/.vite/
+Frontend/.vite-cache/
+Frontend/*.log
 
 # Editor/OS files
 .DS_Store
