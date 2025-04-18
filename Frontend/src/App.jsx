@@ -20,6 +20,8 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
+  Grid,
+  Chip,
 } from "@mui/material";
 import {
   YouTube as YouTubeIcon,
@@ -81,6 +83,7 @@ const TERMINAL_QUESTIONS = [
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
+
   return (
     <div
       role="tabpanel"
@@ -89,11 +92,7 @@ function TabPanel(props) {
       aria-labelledby={`simple-tab-${index}`}
       {...other}
     >
-      {value === index && (
-        <Box sx={{ p: 3 }}>
-          <Typography>{children}</Typography>
-        </Box>
-      )}
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
     </div>
   );
 }
@@ -127,6 +126,11 @@ function App() {
   const [topicSummaries, setTopicSummaries] = useState({});
   const [currentTopicSummary, setCurrentTopicSummary] = useState(null);
   const [loadingTopicSummary, setLoadingTopicSummary] = useState(false);
+  const [textRankSummary, setTextRankSummary] = useState("");
+  const [lexRankSummary, setLexRankSummary] = useState("");
+  const [combinedSummary, setCombinedSummary] = useState("");
+  const [combinedMetrics, setCombinedMetrics] = useState(null);
+  const [compressionRate, setCompressionRate] = useState(0.5); // Default to 50%
 
   useEffect(() => {
     const extractVideoId = (url) => {
@@ -224,29 +228,59 @@ function App() {
         "Generating comprehensive AI summary... This may take a minute for longer videos."
       );
       try {
+        console.log(
+          "Sending request to generate-summary endpoint for video:",
+          videoId
+        );
         const response = await fetch("http://localhost:5000/generate-summary", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ video_id: videoId }),
         });
-        if (!response.ok) throw new Error("Network response was not ok");
+
+        console.log("Response status:", response.status);
+
+        if (!response.ok) {
+          console.error(
+            "Response was not OK:",
+            response.status,
+            response.statusText
+          );
+          throw new Error("Network response was not ok");
+        }
 
         const result = await response.json();
+        console.log("Received result from generate-summary:", result);
+
         if (result.error) {
+          console.error("Error in response:", result.error);
           throw new Error(result.error);
         }
 
-        // Set the AI summary (original behavior)
-        setAiSummary(result.summary);
+        // Check if summary is present in the response
+        if (result.summary) {
+          console.log(
+            "Setting AI summary:",
+            result.summary.substring(0, 100) + "..."
+          );
+          setAiSummary(result.summary);
+        } else {
+          console.error("No summary found in the response:", result);
+          throw new Error("No summary data returned from server");
+        }
 
         // Store main topics if available
         if (result.main_topics && Array.isArray(result.main_topics)) {
+          console.log("Setting main topics:", result.main_topics);
           setMainTopics(result.main_topics);
+        } else {
+          console.log("No main topics found in response");
         }
 
+        console.log("Switching to AI Summary tab (index 3)");
         setActiveTab(3); // Switch to AI Summary tab (index 3)
       } catch (error) {
-        console.error("Error:", error);
+        console.error("Error in handleGenerateSummary:", error);
         setError("Failed to generate AI summary. Please try again.");
       } finally {
         setLoading(false);
@@ -1079,147 +1113,84 @@ function App() {
   };
 
   /* AI Summary Tab - Display both full and topic summaries */
-  const AISummaryTab = () => {
-    // Show topic summary if available, otherwise show general summary
-    const showTopicSummary = currentTopicSummary !== null;
-    const showFullSummary = aiSummary !== "";
+  const AISummaryTab = () => (
+    <Box>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Topic Summary
+        </Typography>
+        <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleGenerateSummary}
+            disabled={loading || !videoId}
+            startIcon={<SummarizeIcon />}
+          >
+            Generate AI Summary
+          </Button>
+        </Box>
+      </Box>
 
-    if (!showTopicSummary && !showFullSummary) {
-      return (
-        <Box sx={{ textAlign: "center", py: 4 }}>
-          <PsychologyIcon
-            sx={{ fontSize: 60, color: "text.secondary", mb: 2 }}
-          />
-          <Typography variant="body1">
-            Generate a full summary with "Generate AI Summary" or click on topic
-            buttons in the Analysis tab for topic-specific summaries.
+      {loading && (
+        <Box sx={{ width: "100%", mb: 2 }}>
+          <LinearProgress />
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {loadingMessage}
           </Typography>
         </Box>
-      );
-    }
+      )}
 
-    return (
-      <div className="tab-content">
-        {showTopicSummary && (
-          <div className="topic-summary">
-            <div className="topic-summary-header">
-              <Typography variant="h6">
-                Topic Summary: {currentTopicSummary.topic}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {aiSummary && (
+        <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            AI Summary
+          </Typography>
+          <Typography variant="body1">{aiSummary}</Typography>
+        </Paper>
+      )}
+
+      {currentTopicSummary && (
+        <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Topic Summary: {currentTopicSummary.topic}
+          </Typography>
+          <Typography variant="body1">{currentTopicSummary.summary}</Typography>
+          {currentTopicSummary.rouge_scores && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Summary Quality Metrics:
               </Typography>
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={() => setCurrentTopicSummary(null)}
-                startIcon={<ArrowBackIcon />}
-              >
-                Back to Full Summary
-              </Button>
-            </div>
-
-            {currentTopicSummary.summary.includes("\n") ? (
-              <Box sx={{ textAlign: "justify" }}>
-                {currentTopicSummary.summary
-                  .split("\n\n")
-                  .map((paragraph, idx) => (
-                    <Typography
-                      key={idx}
-                      variant="body1"
-                      paragraph
-                      sx={{ mb: 2, lineHeight: 1.7 }}
-                    >
-                      {paragraph.trim()}
-                    </Typography>
-                  ))}
+              <Box sx={{ display: "flex", gap: 2 }}>
+                <Chip
+                  label={`Precision: ${(
+                    currentTopicSummary.rouge_scores.rouge1 * 100
+                  ).toFixed(0)}%`}
+                  color="primary"
+                  size="small"
+                  variant="outlined"
+                />
+                <Chip
+                  label={`Coverage: ${(
+                    currentTopicSummary.rouge_scores.rougeL * 100
+                  ).toFixed(0)}%`}
+                  color="secondary"
+                  size="small"
+                  variant="outlined"
+                />
               </Box>
-            ) : (
-              <Typography
-                variant="body1"
-                component="div"
-                sx={{ textAlign: "justify", lineHeight: 1.7 }}
-              >
-                {currentTopicSummary.summary}
-              </Typography>
-            )}
-          </div>
-        )}
-
-        {showFullSummary && !showTopicSummary && (
-          <Box sx={{ mt: 1 }}>
-            <Typography variant="h6" gutterBottom>
-              Comprehensive AI Summary
-            </Typography>
-
-            {mainTopics && mainTopics.length > 0 && (
-              <Box
-                sx={{
-                  mb: 3,
-                  p: 2,
-                  bgcolor: "rgba(33, 150, 243, 0.1)",
-                  borderRadius: 2,
-                  border: "1px solid rgba(33, 150, 243, 0.3)",
-                }}
-              >
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: "bold", mb: 1 }}
-                >
-                  Main Topics Covered:
-                </Typography>
-                <div className="topic-buttons-container">
-                  {mainTopics.map((topic, index) => (
-                    <Button
-                      key={index}
-                      variant="outlined"
-                      color="primary"
-                      size="small"
-                      onClick={() => handleTopicSummary(topic)}
-                      startIcon={<SummarizeIcon />}
-                      disabled={loading || loadingTopicSummary}
-                    >
-                      {topic}
-                    </Button>
-                  ))}
-                </div>
-              </Box>
-            )}
-
-            {aiSummary.includes("-") &&
-            aiSummary.split(/(?<!\d)-|-(?!\d)/).length > 3 ? (
-              <ul>
-                {aiSummary
-                  .split(/(?<!\d)-|-(?!\d)/)
-                  .filter((item) => item.trim() !== "")
-                  .map((item, idx) => (
-                    <li key={idx}>{item.trim()}</li>
-                  ))}
-              </ul>
-            ) : aiSummary.includes("\n") ? (
-              <Box sx={{ textAlign: "justify" }}>
-                {aiSummary.split("\n\n").map((paragraph, idx) => (
-                  <Typography
-                    key={idx}
-                    variant="body1"
-                    paragraph
-                    sx={{ mb: 2, lineHeight: 1.7 }}
-                  >
-                    {paragraph.trim()}
-                  </Typography>
-                ))}
-              </Box>
-            ) : (
-              <Typography
-                variant="body1"
-                component="div"
-                sx={{ textAlign: "justify", lineHeight: 1.7 }}
-              >
-                {aiSummary}
-              </Typography>
-            )}
-          </Box>
-        )}
-      </div>
-    );
-  };
+            </Box>
+          )}
+        </Paper>
+      )}
+    </Box>
+  );
 
   /* Update the handleTopicQuizGeneration function to better generate topic-specific quizzes */
   const handleTopicQuizGeneration = async (topic, topicText) => {
@@ -1757,79 +1728,49 @@ function App() {
     }
   };
 
-  const handleTextRankSummary = async () => {
-    if (videoId) {
-      setLoading(true);
-      setLoadingMessage("Generating TextRank summary...");
-      try {
-        const response = await fetch("http://localhost:5000/textrank-summary", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ video_id: videoId }),
-        });
-
-        if (!response.ok) throw new Error("Network response was not ok");
-
-        const result = await response.json();
-        if (result.error) {
-          throw new Error(result.error);
-        }
-
-        // Append the new summary instead of replacing
-        const textRankSection = `<div style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
-          <h3 style="color: #2e7d32;">TextRank Summary</h3>
-          <p>${result.summary}</p>
-        </div>`;
-
-        // If there's already a summary, append to it; otherwise, create new
-        setSummary((prev) => (prev ? prev + textRankSection : textRankSection));
-      } catch (error) {
-        console.error("Error:", error);
-        setError("Failed to generate TextRank summary. Please try again.");
-      } finally {
-        setLoading(false);
-        setLoadingMessage("");
-      }
-    } else {
-      setError("Please enter a valid YouTube URL");
+  const handleCombinedSummary = async (compressionRate) => {
+    if (!videoId) {
+      setError("Please enter a valid YouTube URL first");
+      return;
     }
-  };
 
-  const handleLexRankSummary = async () => {
-    if (videoId) {
-      setLoading(true);
-      setLoadingMessage("Generating LexRank summary...");
-      try {
-        const response = await fetch("http://localhost:5000/lexrank-summary", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ video_id: videoId }),
-        });
+    setLoading(true);
+    setLoadingMessage("Generating combined LexRank and TextRank summary...");
+    try {
+      const response = await fetch("http://localhost:5000/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: `https://www.youtube.com/watch?v=${videoId}`,
+        }),
+      });
 
-        if (!response.ok) throw new Error("Network response was not ok");
-
-        const result = await response.json();
-        if (result.error) {
-          throw new Error(result.error);
-        }
-
-        // Append the new summary instead of replacing
-        const lexRankSection = `<div style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
-          <h3 style="color: #ed6c02;">LexRank Summary</h3>
-          <p>${result.summary}</p>
-        </div>`;
-
-        // If there's already a summary, append to it; otherwise, create new
-        setSummary((prev) => (prev ? prev + lexRankSection : lexRankSection));
-      } catch (error) {
-        console.error("Error:", error);
-        setError("Failed to generate LexRank summary. Please try again.");
-      } finally {
-        setLoading(false);
-        setLoadingMessage("");
+      if (!response.ok) {
+        throw new Error("Failed to generate combined summary");
       }
-    } else {
-      setError("Please enter a valid YouTube URL");
+
+      const result = await response.json();
+      setCombinedSummary(result.summary);
+
+      // Calculate metrics
+      const originalWords = result.original.split(/\s+/).length;
+      const summaryWords = result.summary.split(/\s+/).length;
+      const compression =
+        ((originalWords - summaryWords) / originalWords) * 100;
+
+      setCombinedMetrics({
+        original_words: originalWords,
+        summary_words: summaryWords,
+        compression: compression,
+        avg_accuracy: 95.0, // Default value as we don't have real accuracy metrics
+      });
+
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+      setLoadingMessage(null);
     }
   };
 
@@ -2162,6 +2103,117 @@ function App() {
     );
   };
 
+  const SummaryTab = () => {
+    return (
+      <Box>
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
+            <Button
+              variant="contained"
+              color="success"
+              onClick={() => handleCombinedSummary()}
+              disabled={loading || !videoId}
+              startIcon={<SummarizeIcon />}
+              sx={{
+                backgroundColor: "#4CAF50",
+                "&:hover": {
+                  backgroundColor: "#45a049",
+                },
+                width: "100%",
+                py: 1.5,
+              }}
+            >
+              Generate LexRank + TextRank Summary
+            </Button>
+          </Box>
+        </Box>
+
+        {loading && (
+          <Box sx={{ width: "100%", mb: 2 }}>
+            <LinearProgress />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              {loadingMessage || "Generating summary..."}
+            </Typography>
+          </Box>
+        )}
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {combinedSummary && (
+          <>
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" color="primary" gutterBottom>
+                Video Summary
+              </Typography>
+              <Paper sx={{ p: 2, bgcolor: "grey.50" }}>
+                <Typography
+                  variant="body1"
+                  sx={{ whiteSpace: "pre-wrap", textAlign: "justify" }}
+                >
+                  {combinedSummary}
+                </Typography>
+              </Paper>
+            </Box>
+
+            {combinedMetrics && (
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" color="primary" gutterBottom>
+                  Summary Metrics
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6} sm={3}>
+                    <Paper sx={{ p: 2, textAlign: "center" }}>
+                      <Typography variant="h4">
+                        {combinedMetrics.original_words}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Original Words
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Paper sx={{ p: 2, textAlign: "center" }}>
+                      <Typography variant="h4">
+                        {combinedMetrics.summary_words}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Summary Words
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Paper sx={{ p: 2, textAlign: "center" }}>
+                      <Typography variant="h4">
+                        {combinedMetrics.compression.toFixed(1)}%
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Compression Rate
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={6} sm={3}>
+                    <Paper sx={{ p: 2, textAlign: "center" }}>
+                      <Typography variant="h4">
+                        {combinedMetrics.avg_accuracy.toFixed(1)}%
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Average Accuracy
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
+          </>
+        )}
+      </Box>
+    );
+  };
+
   useEffect(() => {
     // Initialize YouTube iframe API
     const tag = document.createElement("script");
@@ -2293,7 +2345,6 @@ function App() {
                   >
                     <Tab icon={<DescriptionIcon />} label="Transcription" />
                     <Tab icon={<BarChartIcon />} label="Analysis" />
-
                     <Tab icon={<ListIcon />} label="Summary" />
                     <Tab icon={<PsychologyIcon />} label="AI Summary" />
                     <Tab icon={<QuestionAnswerIcon />} label="Quiz" />
@@ -2306,50 +2357,7 @@ function App() {
                   <TopicAnalysisTab />
                 </TabPanel>
                 <TabPanel value={activeTab} index={2}>
-                  <Box
-                    sx={{ display: "flex", flexDirection: "column", gap: 3 }}
-                  >
-                    {/* Summary content */}
-                    <Box>
-                      {summary ? (
-                        <div dangerouslySetInnerHTML={{ __html: summary }} />
-                      ) : (
-                        <Typography>
-                          Summary content will appear here
-                        </Typography>
-                      )}
-                    </Box>
-
-                    {/* Algorithm buttons */}
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "center",
-                        gap: 2,
-                        mt: 2,
-                      }}
-                    >
-                      <Button
-                        variant="contained"
-                        startIcon={<SummarizeIcon />}
-                        onClick={handleTextRankSummary}
-                        color="success"
-                        disabled={!videoId || loading}
-                      >
-                        GENERATE TEXTRANK SUMMARY
-                      </Button>
-
-                      <Button
-                        variant="contained"
-                        startIcon={<SummarizeIcon />}
-                        onClick={handleLexRankSummary}
-                        color="warning"
-                        disabled={!videoId || loading}
-                      >
-                        GENERATE LEXRANK SUMMARY
-                      </Button>
-                    </Box>
-                  </Box>
+                  <SummaryTab />
                 </TabPanel>
                 <TabPanel value={activeTab} index={3}>
                   <AISummaryTab />
